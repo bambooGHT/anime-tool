@@ -1,0 +1,243 @@
+:root {
+  --primary: #40A7E3;
+  --primary-rgb: 64, 167, 227;
+  --radius: 4px;
+  --transition: 0.2s ease;
+  --border: #b1b1b1;
+}
+
+* {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+button {
+  outline: none;
+}
+.button1 {
+  border-radius: var(--radius);
+  padding: 5px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--primary);
+  border: var(--primary) 1px solid;
+  transition: var(--transition);
+  background-color: transparent;
+}
+
+.button1:active,
+.button1.selected
+ {
+  background: rgba(var(--primary-rgb), 0.1);
+}
+
+@media (hover: hover) {
+  .button1:hover {
+    background: rgba(var(--primary-rgb), 0.1);
+  }
+}
+
+textarea {
+  resize: none;
+  min-height: 80px;
+}
+
+input[type="search"],
+textarea,
+input[type="text"] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 6px;
+  color: var(--text);
+  font-size: 14px;
+  transition: border var(--transition);
+  box-sizing: border-box;
+}
+
+:is(input[type="search"],
+  textarea,
+  input[type="text"]):focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.main {
+  margin: 0 10px;
+  > * {
+    margin: 10px 0;
+  }
+}
+
+.tag {
+  width: max-content;
+  padding: 4px 8px;
+  background-color: #ebebeb;
+  border-radius: 24px;
+  cursor: default;
+  user-select: none;
+}
+.tag-selected {
+  background: rgba(var(--primary-rgb), 0.4);
+}
+.tag-x {
+  cursor: pointer;
+  padding: 2px 0 2px 3px;
+}
+
+.flex-box {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.content {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, 1fr);
+  @media (max-width:800px) {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+.results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 9.5rem));
+  justify-content: center;
+  gap: 8px;
+  @media (max-width:800px) {
+    max-width: 28rem;
+    margin-inline: auto;
+  }
+  > button {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 5px;
+    font-size: 12px;
+  }
+}
+
+.box {
+  border: 1px solid var(--border);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 380px;
+  .title {
+    font-size: 14px;
+    margin: 0 0 4px 0;
+  }
+
+  .res-box {
+    display: grid;
+    gap: 5px;
+    box-sizing: content-box;
+    grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+    margin-bottom: auto;
+    min-height: 115px;
+    li {
+      position: relative;
+      width: 115px;
+      height: 115px;
+      > div {
+        margin-top: 5px;
+        display: flex;
+        align-items: center;
+        input {
+          margin: 0;
+          margin-left: auto;
+          margin-right: 4px;
+        }
+      }
+      > section {
+        border: var(--primary) 1px solid;
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+
+        > span {
+          display: block;
+          position: absolute;
+          right: 0;
+          padding-right: 4px;
+          font-size: 20px;
+          z-index: 10;
+          cursor: pointer;
+        }
+        > div {
+          position: absolute;
+          width: 50%;
+          height: 100%;
+          left: 0;
+          top: 0;
+          z-index: 1;
+          &:nth-of-type(2) {
+            right: 0;
+            left: auto;
+          }
+        }
+        > img {
+          justify-self: center;
+          display: block;
+          object-fit: contain;
+          height: 100%;
+          width: 100%;
+        }
+      }
+
+    }
+
+  }
+  .flex-box {
+    margin-top: 12px;
+    input {
+      flex: 1 1 0%;
+      width: 100%;
+      max-width: 18rem;
+    }
+  }
+  input,
+  textarea {
+    margin-bottom: 12px;
+  }
+
+  &:nth-child(2) {
+    input,
+    textarea {
+      width: 100%;
+    }
+  }
+  .tag-box {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  hr {
+    width: 100%;
+    margin: 8px 0;
+  }
+}
+
+dialog {
+  width: 90%;
+  max-width: 500px;
+  padding: 20px;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  margin: auto;
+}
+
+ul,
+ol,
+li,
+nav {
+  list-style: none;
+}
