@@ -15,16 +15,17 @@ export const mainPage = () => {
 };
 
 const searchBox = () => {
-  return h("section", { class: "flex-box", style: "justify-content: center;" }, [
+  return h("section", { class: "flex-box search-box", style: "justify-content: center;" }, [
     h("input", {
       type: "search", id: "search", placeholder: "search", style: "width: 100%; max-width: 30rem;",
       onKeydown: (e: any) => {
         if (e.key === "Enter") {
-          getAnimeInfo(e.target.value);
+          getAnimeInfo(e.target.value, "hanime");
         }
       }
     }),
-    h("button", { class: "button1", onClick: () => getAnimeInfo(document.querySelector<HTMLInputElement>("#search")!.value) }, "search")
+    h("button", { class: "button1", onClick: () => getAnimeInfo(document.querySelector<HTMLInputElement>("#search")!.value, "hanime") }, "hanime"),
+    h("button", { class: "button1", onClick: () => getAnimeInfo(document.querySelector<HTMLInputElement>("#search")!.value, "noodlemagazine") }, "noodlemagazine")
   ]);
 };
 
@@ -220,7 +221,7 @@ const infoBox = () => {
       h("input", {
         type: "text", placeholder: "api url", value: config.apiUrl,
         onChange: (e: any) => {
-          config.apiUrl = e.target.value;
+          config.apiUrl = e.target.value.replace(/\/$/, '');
           saveConfig();
           updateBaseUrl(e.target.value);
         }

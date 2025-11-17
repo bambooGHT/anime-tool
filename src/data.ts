@@ -68,7 +68,11 @@ export const config: Config = (() => {
     tags: structuredClone(tagsBase)
   };
 
-  if (c.apiUrl) updateBaseUrl(c.apiUrl);
+  if (c.apiUrl) {
+    c.apiUrl = c.apiUrl.replace(/\/$/, '');
+    updateBaseUrl(c.apiUrl);
+  };
+
   return c;
 })();
 
@@ -78,8 +82,8 @@ export const currentAnimeInfo = reactive(structuredClone(toRaw(animeInfo)[0]));
 export const animeTags = reactive<Tag[]>(structuredClone(config.tags));
 export const sendStatus = ref(SendStatus.Pending);
 
-export const getAnimeInfo = async (value: string | number) => {
-  const data = await searchAnime(value);
+export const getAnimeInfo = async (value: string | number, site: "hanime" | "noodlemagazine") => {
+  const data = await searchAnime(value, site);
 
   if (!data.length) {
     animeInfo.splice(0, animeInfo.length, structuredClone(animeInfoBase));
@@ -94,17 +98,19 @@ export const getAnimeInfo = async (value: string | number) => {
         type: p.type,
         has_spoiler: false,
         url: p.url,
-        imgShowUrl: config.apiUrl + p.imgShowUrl
+        imgShowUrl: p.imgShowUrl && p.imgShowUrl.includes("imgProxy") ? config.apiUrl + p.imgShowUrl : p.imgShowUrl
       };
     });
     const videoList = await Promise.all(videos.map<Promise<ResType>>(async (p) => {
-      const videoI = await getVideoinfo(`${config.apiUrl}/videoProxy?url=${p.url}`);
+      const videoI = await getVideoinfo(`${config.apiUrl}/videoProxy?url=${p.url}`).catch(() => {
+        return {};
+      });
       return {
         type: p.type,
         size: p.size,
         has_spoiler: false,
         url: p.url,
-        imgShowUrl: config.apiUrl + p.imgShowUrl,
+        imgShowUrl: p.imgShowUrl && p.imgShowUrl.includes("imgProxy") ? config.apiUrl + p.imgShowUrl : p.imgShowUrl,
         cover: p.cover,
         ...videoI
       };
@@ -156,13 +162,32 @@ export const saveConfig = () => {
 };
 
 export const addAnimeRes = async (url: string, type: "image" | "video") => {
-  url = url.trim();
-  if (!config.apiUrl || !url || !url.startsWith("http") || currentAnimeInfo.resList.find(item => item.url === url)) return;
+  const cleanUrl = url.trim();
+  if (
+    !config.apiUrl ||
+    !cleanUrl ||
+    !cleanUrl.startsWith("http") ||
+    currentAnimeInfo.resList.some(i => i.url === cleanUrl)
+  ) return;
 
-  const proxyUrl = `${config.apiUrl}/${type === "video" ? "videoProxy" : "imgProxy"}?url=${url}`;
-  const { imgShowUrl, ...videoI } = await getVideoThumbnail(proxyUrl);
+  const proxyUrl = `${config.apiUrl}/${type === "video" ? "videoProxy" : "imgProxy"}?url=${cleanUrl}`;
 
-  currentAnimeInfo.resList.push({ type, has_spoiler: false, url, imgShowUrl: type === "video" ? imgShowUrl : proxyUrl, ...videoI });
+  let imgShowUrl = proxyUrl;
+  let extra = {};
+
+  if (type === "video") {
+    const r = await getVideoThumbnail(proxyUrl);
+    imgShowUrl = r.imgShowUrl;
+    extra = r;
+  }
+
+  currentAnimeInfo.resList.push({
+    type,
+    has_spoiler: false,
+    url: cleanUrl,
+    imgShowUrl,
+    ...extra
+  });
 };
 
 export const uploadAnimeRes = async () => {

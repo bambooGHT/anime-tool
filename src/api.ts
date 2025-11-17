@@ -12,13 +12,13 @@ type MessageParams = {
 let base_url = "";
 
 export const updateBaseUrl = (url: string) => {
-  base_url = url.replace(/\/$/, '');
+  base_url = url;
 };
 
-export const searchAnime = async (value: string | number): Promise<AnimeInfoBase[]> => {
+export const searchAnime = async (value: string | number, site: string): Promise<AnimeInfoBase[]> => {
   if (!base_url) return [];
 
-  const res = await fetch(`${base_url}/searchAnime?value=${value}`);
+  const res = await fetch(`${base_url}/searchAnime?value=${value}&site=${site}`);
   return (await res.json()).data;
 };
 
@@ -106,6 +106,10 @@ const loadVideo = async (videoUrl: string) => {
   video.preload = "metadata";
   video.src = videoUrl;
 
-  await new Promise(res => video.onloadedmetadata = res);
+
+  await new Promise((res, rej) => {
+    video.onloadedmetadata = res;
+    video.onerror = () => rej(new Error(`Failed to load video: ${videoUrl}`));
+  });
   return video;
 };

@@ -101,6 +101,19 @@ input[type=text]):focus {
   align-items: flex-start;
 }
 
+.search-box {
+  flex-wrap: wrap;
+}
+.search-box input {
+  flex: 1;
+}
+@media (max-width: 580px) {
+  .search-box input {
+    flex: 1 0 calc(100% - 60px);
+    margin: 0 30px;
+  }
+}
+
 .content {
   display: grid;
   gap: 18px;

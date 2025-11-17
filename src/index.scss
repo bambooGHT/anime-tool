@@ -33,8 +33,7 @@ button {
 }
 
 .button1:active,
-.button1.selected
- {
+.button1.selected {
   background: rgba(var(--primary-rgb), 0.1);
 }
 
@@ -97,6 +96,19 @@ input[type="text"] {
   align-items: flex-start;
 }
 
+.search-box {
+  flex-wrap: wrap;
+  input {
+    flex: 1;
+  }
+
+  @media (max-width:580px) {
+    input {
+      flex: 1 0 calc(100% - 60px);
+      margin: 0 30px;
+    }
+  }
+}
 .content {
   display: grid;
   gap: 18px;
