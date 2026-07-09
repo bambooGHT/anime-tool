@@ -2,6 +2,7 @@ import type { AnimeInfoBase, ResType, Tag } from "./types";
 
 type MessageParams = {
   title: string;
+  id: number;
   botToken: string;
   chatId: string;
   caption: string;

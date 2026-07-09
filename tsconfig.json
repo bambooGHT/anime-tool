@@ -12,10 +12,9 @@
       "ESNext",
       "DOM"
     ],
-    "baseUrl": "./",
     "paths": {
       "@/*": [
-        "./src/*"
+        "/src/*"
       ]
     }
   },

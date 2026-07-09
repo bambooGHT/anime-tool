@@ -3,8 +3,14 @@ import { updateBaseUrl } from "./api";
 import {
   addAnimeRes, addConfigTag, animeInfo, currentAnimeInfo, animeTags,
   config, deleteAnimeRes, deleteConfigTag, getAnimeInfo, saveConfig,
-  sendTgMessage, swapAnimeResItems, uploadAnimeRes, changeCurrentAnimeInfo, sendStatus, SendStatus
+  sendTgMessage, swapAnimeResItems, uploadAnimeRes, changeCurrentAnimeInfo,
+  modifyAnimeInfo,
+  removeAnimeInfo,
+  animeSendList,
+  addAnimeToSendList,
 } from "./data";
+import { Space, DatePicker } from "tdesign-vue-next";
+import { SendStatus } from "./enums";
 
 export const mainPage = () => {
   return [
@@ -32,7 +38,8 @@ const searchBox = () => {
 const resultItemsBox = () => {
   return h("section", { class: "results" }, animeInfo.map((p, index) => {
     return h("button", {
-      class: { "button1": true, "selected": p.name + p.resList[0]?.url === currentAnimeInfo.name + currentAnimeInfo.resList[0]?.url },
+      key: index + Date.now(),
+      class: { "button1": true, "selected": p.name + p.resList[0]?.url === currentAnimeInfo.value.name + currentAnimeInfo.value.resList[0]?.url },
       onClick: () => changeCurrentAnimeInfo(index)
     }, p.name || "undefined");
   }));
@@ -49,8 +56,8 @@ const resBox = () => {
   const resUrl = ref("");
   return () => h("section", { class: "box" }, [
     h("ul", { class: "res-box" }, [
-      currentAnimeInfo.resList.map((item, i) => {
-        return h("li", { key: i }, [
+      currentAnimeInfo.value.resList.map((item, i) => {
+        return h("li", { key: i + Date.now() }, [
           h("section", [
             h("span", {
               innerHTML: "&#10005;", onClick: () => deleteAnimeRes(i)
@@ -73,6 +80,7 @@ const resBox = () => {
     h("section", { class: "flex-box" }, [
       h("input", {
         type: "text", placeholder: "video/image url", value: resUrl.value,
+        style: "margin-bottom: 0px;",
         onInput: (e: any) => {
           resUrl.value = e.target.value;
         },
@@ -99,28 +107,28 @@ const infoBox = () => {
   return () => h("section", { class: "box" }, [
     h("p", { class: "title" }, "标题"),
     h("input", {
-      type: "text", placeholder: "title", value: currentAnimeInfo.name,
+      type: "text", placeholder: "title", value: currentAnimeInfo.value.name,
       onChange: (e: any) => {
-        currentAnimeInfo.name = e.target.value;
+        currentAnimeInfo.value.name = e.target.value;
       }
     }),
     h("p", { class: "title" }, "中文标题"),
     h("input", {
-      type: "text", placeholder: "CN title", value: currentAnimeInfo.CN_name,
+      type: "text", placeholder: "CN title", value: currentAnimeInfo.value.CN_name,
       onChange: (e: any) => {
-        currentAnimeInfo.CN_name = e.target.value;
+        currentAnimeInfo.value.CN_name = e.target.value;
       }
     }),
     h("p", { class: "title" }, "描述"),
     h("textarea", {
-      placeholder: "description", value: currentAnimeInfo.description,
+      placeholder: "description", value: currentAnimeInfo.value.description,
       onChange: (e: any) => {
-        currentAnimeInfo.description = e.target.value;
+        currentAnimeInfo.value.description = e.target.value;
       }
     }),
     h("p", { class: "title" }, "标签"),
     h("ul", { class: "tag-box" }, [
-      ...currentAnimeInfo.tags.map(p => {
+      ...currentAnimeInfo.value.tags.map(p => {
         return h("li", {
           key: p.title,
           class: {
@@ -134,7 +142,7 @@ const infoBox = () => {
         );
       })
     ]),
-    animeTags.length && currentAnimeInfo.tags.length ? h("hr") : null,
+    animeTags.length && currentAnimeInfo.value.tags.length ? h("hr") : null,
     h("ul", { class: "tag-box" }, [
       ...animeTags.map((p, index) => {
         return h("li", {
@@ -159,7 +167,7 @@ const infoBox = () => {
     ]),
     h("section", { class: "flex-box" }, [
       h("input", {
-        type: "text", style: "max-width: 100%;", placeholder: "tag",
+        type: "text", style: "max-width: 100%;margin-bottom: 0px;", placeholder: "tag",
         value: tag.value,
         onInput: (e: any) => {
           tag.value = e.target.value;
@@ -185,24 +193,48 @@ const infoBox = () => {
       }, "临时添加")
     ]),
     h("section", { class: "flex-box" }, [
+      h(Space, {
+        key: currentAnimeInfo.value.name + currentAnimeInfo.value.CN_name,
+        direction: 'vertical'
+      }, {
+        default: () => [
+          h(DatePicker, {
+            enableTimePicker: true,
+            allowInput: true,
+            clearable: true,
+            needConfirm: false,
+            value: currentAnimeInfo.value.timedSend,
+            onChange(value, context) {
+              currentAnimeInfo.value.timedSend = value as string;
+            },
+          })
+        ]
+      }),
+      h("button", { class: "button1", onClick: () => addAnimeToSendList(currentAnimeInfo.value) }, "添加到队列"),
+    ]),
+    h("section", { class: "flex-box" }, [
+      h("button", {
+        class: "button1 button-send", style: {
+          color: statusConfig[currentAnimeInfo.value.sendStatus].color,
+          "border-color": statusConfig[currentAnimeInfo.value.sendStatus].color,
+        },
+        onClick: statusConfig[currentAnimeInfo.value.sendStatus].disabled ? undefined : () => sendTgMessage(currentAnimeInfo.value),
+        disabled: statusConfig[currentAnimeInfo.value.sendStatus].disabled,
+      }, `${statusConfig[currentAnimeInfo.value.sendStatus].text}`),
       h("button", {
         class: "button1", onClick: () => {
-          (document.getElementById("dialog1") as HTMLDialogElement).showModal();
+          (document.getElementById("dialog-sendList") as HTMLDialogElement).showModal();
         }
-      }, "配置"),
-      h("button", { class: "button1", onClick: sendTgMessage }, "发送"),
-      sendStatus.value !== SendStatus.Pending && h("button", { class: "button1", style: "pointer-events: none;" }, "send " + SendStatus[sendStatus.value].toLowerCase()),
+      }, "队列"),
+      h("button", {
+        class: "button1", onClick: () => {
+          (document.getElementById("dialog-config") as HTMLDialogElement).showModal();
+        }
+      }, "配置")
     ]),
+
     h("dialog", {
-      id: "dialog1", onClick: (e) => {
-        const rect = (e.currentTarget as HTMLDialogElement).getBoundingClientRect();
-        if (e.clientX < rect.left ||
-          e.clientX > rect.right ||
-          e.clientY < rect.top ||
-          e.clientY > rect.bottom) {
-          (e.currentTarget as HTMLDialogElement).close();
-        }
-      }
+      id: "dialog-config", onClick: closeDialog
     }, [
       h("input", {
         type: "text", placeholder: "bot token", value: config.botToken,
@@ -226,6 +258,79 @@ const infoBox = () => {
           updateBaseUrl(e.target.value);
         }
       }),
+    ]),
+    h("dialog", {
+      id: "dialog-sendList", onClick: closeDialog
+    }, [
+      h("ul",
+        animeSendList.map((item, index) => {
+          return h("li", { key: index + item.name }, [
+            h("p", { class: "title" }, item.name),
+            h("div", { class: "flex-box" }, [
+
+              h("img", {
+                src: item.resList[0]?.imgShowUrl,
+                tabindex: "-1",
+                autofocus: true,
+                style: "outline: none;"
+              }),
+              h("div", [
+                h(Space, {
+                  direction: 'vertical',
+                }, {
+                  default: () => [
+                    h(DatePicker, {
+                      enableTimePicker: true,
+                      allowInput: true,
+                      clearable: true,
+                      needConfirm: false,
+                      value: item.timedSend,
+                      popupProps: {
+                        attach: '#dialog-sendList',
+                      },
+                      onChange: (value) => {
+                        item.timedSend = value as string;
+                      },
+                    })
+                  ]
+                }),
+                h("div", { class: "flex-box" }, [
+                  h("button", {
+                    class: "button1 button-send", style: { color: statusConfig[item.sendStatus].color, "border-color": statusConfig[item.sendStatus].color },
+                    onClick: statusConfig[item.sendStatus].disabled ? undefined : () => sendTgMessage(item),
+                    disabled: statusConfig[item.sendStatus].disabled,
+                  }, `${statusConfig[item.sendStatus].text}`),
+                  h("button", {
+                    class: "button1",
+                    disabled: statusConfig[item.sendStatus].disabled,
+                    onClick: () => {
+                      modifyAnimeInfo(item);
+                      (document.getElementById("dialog-sendList") as HTMLDialogElement).close();
+                    }
+                  }, "修改"),
+                  h("button", { class: "button1", onClick: () => removeAnimeInfo(item) }, "删除"),
+                ])
+              ])
+            ]),
+          ]);
+        }))
     ])
   ]);
+};
+
+const closeDialog = (e: PointerEvent) => {
+  const rect = (e.currentTarget as HTMLDialogElement).getBoundingClientRect();
+  if (e.clientX < rect.left ||
+    e.clientX > rect.right ||
+    e.clientY < rect.top ||
+    e.clientY > rect.bottom) {
+    (e.currentTarget as HTMLDialogElement).close();
+  }
+};
+
+const statusConfig: Record<SendStatus, { text: string; color: string | undefined; disabled: boolean; }> = {
+  [SendStatus.Pending]: { text: '发送', color: undefined, disabled: false },
+  [SendStatus.Sending]: { text: '发送中...', color: '#999', disabled: true },
+  [SendStatus.Success]: { text: '已发送', color: '#67C23A', disabled: true },
+  [SendStatus.Failed]: { text: '重新发送', color: '#F56C6C', disabled: false }
 };

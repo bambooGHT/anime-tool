@@ -1,19 +1,17 @@
 import { reactive, ref, toRaw } from "vue";
-import type { AnimeInfo, Config, ResType, Tag } from "./types";
+import type { AnimeInfo, AnimeInfoBase, Config, ResType, Tag } from "./types";
 import { getVideoinfo, getVideoThumbnail, searchAnime, sendMessage, updateBaseUrl } from "./api";
+import { SendStatus } from "./enums";
 
-export enum SendStatus {
-  Pending,
-  Sending,
-  Success,
-  Failed,
-}
 const animeInfoBase: AnimeInfo = {
   name: "",
   CN_name: "",
   description: "",
+  id: 0,
   resList: [],
-  tags: []
+  tags: [],
+  timedSend: "",
+  sendStatus: SendStatus.Pending
 };
 
 const tagsBase: Tag[] = [
@@ -76,11 +74,39 @@ export const config: Config = (() => {
   return c;
 })();
 
+const scheduleQueue = {
+  timer: null as null | number,
+  start() {
+    if (this.timer) return;
+    this.timer = setInterval(() => this.tick(), 1000);
+  },
+  stop() {
+    this.timer && clearInterval(this.timer);
+    this.timer = null;
+  },
+  tick() {
+    const chinaTime = Date.now();
+    let s = false;
+
+    for (const item of animeSendList) {
+      if (item.sendStatus === SendStatus.Pending && item.timedSend) {
+        s = true;
+        const t = new Date((<string>item.timedSend).replace(' ', 'T') + '+08:00').getTime();
+        if (t <= chinaTime) {
+          sendTgMessage(item);
+        }
+      };
+      if (!s) {
+        this.stop();
+      }
+    }
+  }
+};
 
 export const animeInfo = reactive<AnimeInfo[]>([structuredClone(animeInfoBase)]);
-export const currentAnimeInfo = reactive(structuredClone(toRaw(animeInfo)[0]));
+export const currentAnimeInfo = ref(animeInfo[0]);
 export const animeTags = reactive<Tag[]>(structuredClone(config.tags));
-export const sendStatus = ref(SendStatus.Pending);
+export const animeSendList = reactive<AnimeInfo[]>([]);
 
 export const getAnimeInfo = async (value: string | number, site: "hanime" | "noodlemagazine") => {
   const data = await searchAnime(value, site);
@@ -91,6 +117,10 @@ export const getAnimeInfo = async (value: string | number, site: "hanime" | "noo
     return;
   }
 
+  await setAnimeInfo(data);
+};
+
+const setAnimeInfo = async (data: AnimeInfoBase[]) => {
   const result: AnimeInfo[] = await Promise.all(data.map(async (item) => {
     const { images, videos, tags, ...v } = item;
     const imageList = images.map<ResType>(p => {
@@ -129,23 +159,50 @@ export const getAnimeInfo = async (value: string | number, site: "hanime" | "noo
       return list;
     }, []);
 
-    return { ...v, resList: [...imageList, ...videoList], tags: tagList };
+    return {
+      ...v, resList: [...imageList, ...videoList], tags: tagList,
+      timedSend: "",
+      sendStatus: SendStatus.Pending
+    };
   }));
 
   animeInfo.splice(0, animeInfo.length, ...result);
   changeCurrentAnimeInfo(0);
 };
 
+export const addAnimeToSendList = (_animeInfo: AnimeInfo) => {
+  let item = animeSendList.find(p => p === _animeInfo);
+  if (item) return;
+
+  animeSendList.push(_animeInfo);
+  scheduleQueue.start();
+};
+
+export const modifyAnimeInfo = (_animeInfo: AnimeInfo) => {
+  let index = animeInfo.findIndex(p => p === _animeInfo);
+  if (index === -1) {
+    animeInfo.push(_animeInfo);
+    index = animeInfo.length - 1;
+  }
+
+  changeCurrentAnimeInfo(index);
+};
+
+export const removeAnimeInfo = (_animeInfo: AnimeInfo) => {
+  const index = animeSendList.findIndex(p => p === _animeInfo);
+  if (index !== -1) animeSendList.splice(index, 1);
+};
+
 export const changeCurrentAnimeInfo = (index: number) => {
-  Object.assign(currentAnimeInfo, structuredClone(toRaw(animeInfo)[index]));
+  currentAnimeInfo.value = animeInfo[index];
 };
 
 export const addConfigTag = (title: string, temporary: boolean = false) => {
   title = title.trim();
-  if (!title || [...animeTags, ...currentAnimeInfo.tags].find(p => p.title === title)) return;
+  if (!title || [...animeTags, ...currentAnimeInfo.value.tags].find(p => p.title === title)) return;
 
-  const index = currentAnimeInfo.tags.findIndex(p => p.title === title);
-  if (index !== -1 && temporary) currentAnimeInfo.tags.splice(index, 1);
+  const index = currentAnimeInfo.value.tags.findIndex(p => p.title === title);
+  if (index !== -1 && temporary) currentAnimeInfo.value.tags.splice(index, 1);
 
   animeTags.push({ selected: true, temporary, title });
   saveConfig();
@@ -167,7 +224,7 @@ export const addAnimeRes = async (url: string, type: "image" | "video") => {
     !config.apiUrl ||
     !cleanUrl ||
     !cleanUrl.startsWith("http") ||
-    currentAnimeInfo.resList.some(i => i.url === cleanUrl)
+    currentAnimeInfo.value.resList.some(i => i.url === cleanUrl)
   ) return;
 
   const proxyUrl = `${config.apiUrl}/${type === "video" ? "videoProxy" : "imgProxy"}?url=${cleanUrl}`;
@@ -181,7 +238,7 @@ export const addAnimeRes = async (url: string, type: "image" | "video") => {
     extra = r;
   }
 
-  currentAnimeInfo.resList.push({
+  currentAnimeInfo.value.resList.push({
     type,
     has_spoiler: false,
     url: cleanUrl,
@@ -191,7 +248,7 @@ export const addAnimeRes = async (url: string, type: "image" | "video") => {
 };
 
 export const uploadAnimeRes = async () => {
-  const fileHandles = await window.showOpenFilePicker({
+  const fileHandles = await (<any>window).showOpenFilePicker({
     multiple: true,
     types: [{
       description: 'Images & Videos',
@@ -204,39 +261,40 @@ export const uploadAnimeRes = async () => {
 
   for (const handle of fileHandles) {
     const file = await handle.getFile();
-    if (currentAnimeInfo.resList.find(p => {
+    if (currentAnimeInfo.value.resList.find(p => {
       if (p.file) return `${p.file.lastModified}_${p.file.size}` === `${file.lastModified}_${file.size}`;
     })) return;
 
     if (file.type.startsWith('image/')) {
-      currentAnimeInfo.resList.push({ type: file.type, has_spoiler: false, url: URL.createObjectURL(file), file });
+      currentAnimeInfo.value.resList.push({ type: file.type, has_spoiler: false, url: URL.createObjectURL(file), file });
     } else if (file.type.startsWith('video/')) {
       const videoUrl = URL.createObjectURL(file);
       const { imgShowUrl, ...videoI } = await getVideoThumbnail(videoUrl);
 
       URL.revokeObjectURL(videoUrl);
-      currentAnimeInfo.resList.push({ type: file.type, has_spoiler: false, url: imgShowUrl, file, ...videoI });
+      currentAnimeInfo.value.resList.push({ type: file.type, has_spoiler: false, url: imgShowUrl, file, ...videoI });
     }
   }
 };
 
 export const deleteAnimeRes = (index: number) => {
-  currentAnimeInfo.resList.splice(index, 1);
+  currentAnimeInfo.value.resList.splice(index, 1);
 };
 
 export const swapAnimeResItems = (index: number, index2: number) => {
-  const { resList } = currentAnimeInfo;
+  const { resList } = currentAnimeInfo.value;
   if (!resList[index2]) return;
 
   [resList[index], resList[index2]] = [resList[index2], resList[index]];
 };
 
-export const sendTgMessage = () => {
+export const sendTgMessage = (_animeInfo: AnimeInfo) => {
   const { botToken, chatId } = config;
-  if (!botToken || !chatId || sendStatus.value == SendStatus.Sending) return;
-  sendStatus.value = SendStatus.Sending;
+  if (!botToken || !chatId) return;
 
-  const { name, CN_name, description, resList, tags } = toRaw(currentAnimeInfo);
+  _animeInfo.sendStatus = SendStatus.Sending;
+
+  const { name, id, CN_name, description, resList, tags } = toRaw(_animeInfo);
   const tagList = [...tags, ...animeTags].filter(p => p.selected);
   const text = [
     "#" + name.trim(),
@@ -247,13 +305,17 @@ export const sendTgMessage = () => {
 
   sendMessage({
     title: name,
+    id,
     botToken: config.botToken,
     chatId: config.chatId,
     caption: escapeMarkdownV2(text),
     parse_mode: "MarkdownV2",
     resList
-  }).then(() => sendStatus.value = SendStatus.Success)
-    .catch(() => sendStatus.value = SendStatus.Failed);
+  }).then(() => _animeInfo.sendStatus = SendStatus.Success)
+    .catch(() => _animeInfo.sendStatus = SendStatus.Failed);
+
+  if (animeSendList.find(p => p === _animeInfo)) return;
+  animeSendList.push(_animeInfo);
 };
 
 function escapeMarkdownV2(text: string, excludeReservedChars: string[] = []) {
